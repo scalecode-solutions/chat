@@ -313,8 +313,15 @@ func (a *adapter) CreateDb(reset bool) error {
 		}
 	}
 
+	// Try to create database. If it already exists, that's fine - we'll just use it.
 	if _, err = a.db.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s WITH ENCODING utf8;", a.dbName)); err != nil {
-		return err
+		// Check if error is "database already exists" - if so, ignore it
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "42P04" {
+			// Database already exists, continue
+			err = nil
+		} else {
+			return err
+		}
 	}
 
 	a.poolConfig.ConnConfig.Database = a.dbName

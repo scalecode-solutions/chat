@@ -1,0 +1,75 @@
+# Custom Tinode Docker image built from source with PostgreSQL fix
+FROM golang:1.24-alpine AS builder
+
+RUN apk add --no-cache git bash
+
+WORKDIR /go/src/github.com/tinode/chat
+
+# Copy the entire source tree
+COPY . .
+
+# Build tinode server and init-db for PostgreSQL
+RUN go build -tags postgres -o /tinode ./server
+RUN go build -tags postgres -o /init-db ./tinode-db
+RUN go build -o /keygen ./keygen
+
+# Runtime image
+FROM alpine:3.22
+
+LABEL maintainer="Custom Build"
+LABEL name="TinodeChatServerPostgres"
+
+# Runtime environment variables
+ENV TARGET_DB=postgres
+ENV WAIT_FOR=
+ENV RESET_DB=false
+ENV UPGRADE_DB=false
+ENV NO_DB_INIT=false
+ENV SAMPLE_DATA=data.json
+ENV DEFAULT_COUNTRY_CODE=US
+ENV POSTGRES_DSN='postgresql://postgres:postgres@localhost:5432/tinode?sslmode=disable&connect_timeout=10'
+ENV PLUGIN_PYTHON_CHAT_BOT_ENABLED=false
+ENV MEDIA_HANDLER=fs
+ENV FS_CORS_ORIGINS='["*"]'
+ENV AWS_CORS_ORIGINS='["*"]'
+ENV API_KEY_SALT=T713/rYYgW7g4m3vG6zGRh7+FM1t0T8j13koXScOAj4=
+ENV AUTH_TOKEN_KEY=wfaY2RgF2S1OQI/ZlK+LSrp1KB2jwAdGAIHQ7JZn+Kc=
+ENV UID_ENCRYPTION_KEY=la6YsO+bNX/+XIkOqc5Svw==
+ENV TLS_ENABLED=false
+ENV FCM_PUSH_ENABLED=false
+ENV FCM_INCLUDE_ANDROID_NOTIFICATION=true
+ENV TNPG_PUSH_ENABLED=false
+ENV WEBRTC_ENABLED=false
+ENV STORE_USE_ADAPTER=postgres
+ENV SERVER_STATUS_PATH=''
+ENV ACC_GC_ENABLED=false
+
+RUN apk update && apk add --no-cache ca-certificates bash grep netcat-openbsd
+
+WORKDIR /opt/tinode
+
+# Copy binaries from builder
+COPY --from=builder /tinode .
+COPY --from=builder /init-db .
+COPY --from=builder /keygen .
+
+# Copy config and scripts
+COPY docker/tinode/config.template .
+COPY docker/tinode/entrypoint.sh .
+COPY tinode-db/credentials.sh .
+COPY tinode-db/data.json .
+COPY tinode-db/*.jpg ./
+
+# Create static directory and botdata
+RUN mkdir -p static /botdata
+
+# Make scripts executable
+RUN chmod +x entrypoint.sh credentials.sh
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
+  CMD nc -z localhost 6060 || exit 1
+
+ENTRYPOINT ["./entrypoint.sh"]
+
+EXPOSE 6060 16060
