@@ -1103,6 +1103,20 @@ func (mr *MockMessagesPersistenceInterfaceMockRecorder) Save(msg, attachmentURLs
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockMessagesPersistenceInterface)(nil).Save), msg, attachmentURLs, readBySender)
 }
 
+// AddReaction mocks base method.
+func (m *MockMessagesPersistenceInterface) AddReaction(topic string, seqId int, oderId string, reaction string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddReaction", topic, seqId, oderId, reaction)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddReaction indicates an expected call of AddReaction.
+func (mr *MockMessagesPersistenceInterfaceMockRecorder) AddReaction(topic, seqId, oderId, reaction interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddReaction", reflect.TypeOf((*MockMessagesPersistenceInterface)(nil).AddReaction), topic, seqId, oderId, reaction)
+}
+
 // MockDevicePersistenceInterface is a mock of DevicePersistenceInterface interface.
 type MockDevicePersistenceInterface struct {
 	ctrl     *gomock.Controller

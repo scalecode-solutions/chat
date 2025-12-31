@@ -270,6 +270,7 @@ enum InfoNote {
 	RECV = 2;
 	KP = 3;
 	CALL = 4;
+	REACT = 5;
 }
 
 enum CallEvent {
@@ -288,7 +289,7 @@ enum CallEvent {
 message ClientNote {
 	string topic = 1;
 	// what is being reported: "recv" - message received, "read" - message read,
-	// "kp" - typing notification, "call" - voice/video call
+	// "kp" - typing notification, "call" - voice/video call, "react" - emoji reaction
 	InfoNote what = 2;
 	// Server-issued message ID being reported
 	int32 seq_id = 3;
@@ -298,6 +299,8 @@ message ClientNote {
 	CallEvent event = 5;
 	// Arbitrary json payload (used in video calls).
 	bytes payload = 6;
+	// Emoji reaction (used with what=REACT).
+	string reaction = 7;
 }
 
 message ClientExtra {
@@ -478,6 +481,8 @@ message ServerInfo {
 	string src = 5;
 	CallEvent event = 6;
 	bytes payload = 7;
+	// Emoji reaction (used with what=REACT).
+	string reaction = 8;
 }
 
 // Cumulative message

@@ -1175,6 +1175,13 @@ func (t *Topic) handleNoteBroadcast(msg *ClientComMessage) {
 		// Handle calls separately.
 		t.handleCallEvent(msg)
 		return
+	case "react":
+		// Handle emoji reactions separately.
+		if !mode.IsReader() {
+			return
+		}
+		t.handleReaction(msg)
+		return
 	}
 
 	var read, recv, unread, seq int
@@ -1258,6 +1265,48 @@ func (t *Topic) handleNoteBroadcast(msg *ClientComMessage) {
 			From:  msg.AsUser,
 			What:  msg.Note.What,
 			SeqId: msg.Note.SeqId,
+		},
+		RcptTo:    msg.RcptTo,
+		AsUser:    msg.AsUser,
+		Timestamp: msg.Timestamp,
+		SkipSid:   msg.sess.sid,
+		sess:      msg.sess,
+	}
+
+	t.broadcastToSessions(info)
+}
+
+// handleReaction processes emoji reaction {note what="react"} messages.
+func (t *Topic) handleReaction(msg *ClientComMessage) {
+	asUid := types.ParseUserId(msg.AsUser)
+	seqId := msg.Note.SeqId
+	reaction := msg.Note.Reaction
+
+	// Validate reaction length (max 32 chars for multi-codepoint emoji).
+	if len(reaction) > 32 {
+		return
+	}
+
+	// Validate SeqId is within valid range.
+	if seqId > t.lastID || seqId <= 0 {
+		return
+	}
+
+	// Update the message's Head.reactions in the database.
+	err := store.Messages.AddReaction(t.name, seqId, asUid.UserId(), reaction)
+	if err != nil {
+		logs.Warn.Printf("topic[%s]: failed to add reaction: %v", t.name, err)
+		return
+	}
+
+	// Broadcast the reaction to all topic subscribers.
+	info := &ServerComMessage{
+		Info: &MsgServerInfo{
+			Topic:    msg.Original,
+			From:     msg.AsUser,
+			What:     "react",
+			SeqId:    seqId,
+			Reaction: reaction,
 		},
 		RcptTo:    msg.RcptTo,
 		AsUser:    msg.AsUser,

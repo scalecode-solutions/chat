@@ -678,6 +678,7 @@ type MessagesPersistenceInterface interface {
 	DeleteList(topic string, delID int, forUser types.Uid, msgDelAge time.Duration, ranges []types.Range) error
 	GetAll(topic string, forUser types.Uid, opt *types.QueryOpt) ([]types.Message, error)
 	GetDeleted(topic string, forUser types.Uid, opt *types.QueryOpt) ([]types.Range, int, error)
+	AddReaction(topic string, seqId int, oderId string, reaction string) error
 }
 
 // messagesMapper is a concrete type implementing MessagesPersistenceInterface.
@@ -833,6 +834,12 @@ func (messagesMapper) GetDeleted(topic string, forUser types.Uid, opt *types.Que
 	ranges = types.RangeSorter(ranges).Normalize()
 
 	return ranges, maxID, nil
+}
+
+// AddReaction adds or removes an emoji reaction to a message.
+// If the user already has this reaction, it is removed (toggle behavior).
+func (messagesMapper) AddReaction(topic string, seqId int, oderId string, reaction string) error {
+	return adp.MessageAddReaction(topic, seqId, oderId, reaction)
 }
 
 // Registered authentication handlers.

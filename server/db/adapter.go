@@ -166,6 +166,8 @@ type Adapter interface {
 	MessageDeleteList(topic string, toDel *t.DelMessage) error
 	// MessageGetDeleted returns a list of deleted message Ids.
 	MessageGetDeleted(topic string, forUser t.Uid, opts *t.QueryOpt) ([]t.DelMessage, error)
+	// MessageAddReaction adds or removes an emoji reaction to a message.
+	MessageAddReaction(topic string, seqId int, oderId string, reaction string) error
 
 	// Devices (for push notifications)
 

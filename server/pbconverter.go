@@ -106,6 +106,7 @@ func pbServInfoSerialize(info *MsgServerInfo) *pbx.ServerMsg_Info {
 			SeqId:      int32(info.SeqId),
 			Event:      pbCallEventSerialize(info.Event),
 			Payload:    info.Payload,
+			Reaction:   info.Reaction,
 		},
 	}
 }
@@ -213,13 +214,14 @@ func pbServDeserialize(pkt *pbx.ServerMsg) *ServerComMessage {
 		}
 	} else if info := pkt.GetInfo(); info != nil {
 		msg.Info = &MsgServerInfo{
-			Topic:   info.GetTopic(),
-			Src:     info.GetSrc(),
-			From:    info.GetFromUserId(),
-			What:    pbInfoNoteWhatDeserialize(info.GetWhat()),
-			SeqId:   int(info.GetSeqId()),
-			Event:   pbCallEventDeserialize(info.GetEvent()),
-			Payload: info.GetPayload(),
+			Topic:    info.GetTopic(),
+			Src:      info.GetSrc(),
+			From:     info.GetFromUserId(),
+			What:     pbInfoNoteWhatDeserialize(info.GetWhat()),
+			SeqId:    int(info.GetSeqId()),
+			Event:    pbCallEventDeserialize(info.GetEvent()),
+			Payload:  info.GetPayload(),
+			Reaction: info.GetReaction(),
 		}
 	} else if meta := pkt.GetMeta(); meta != nil {
 		msg.Meta = &MsgServerMeta{
@@ -362,12 +364,13 @@ func pbCliSerialize(msg *ClientComMessage) *pbx.ClientMsg {
 	case msg.Note != nil:
 		pkt.Message = &pbx.ClientMsg_Note{
 			Note: &pbx.ClientNote{
-				Topic:   msg.Note.Topic,
-				What:    pbInfoNoteWhatSerialize(msg.Note.What),
-				SeqId:   int32(msg.Note.SeqId),
-				Unread:  int32(msg.Note.Unread),
-				Event:   pbCallEventSerialize(msg.Note.Event),
-				Payload: msg.Note.Payload,
+				Topic:    msg.Note.Topic,
+				What:     pbInfoNoteWhatSerialize(msg.Note.What),
+				SeqId:    int32(msg.Note.SeqId),
+				Unread:   int32(msg.Note.Unread),
+				Event:    pbCallEventSerialize(msg.Note.Event),
+				Payload:  msg.Note.Payload,
+				Reaction: msg.Note.Reaction,
 			},
 		}
 	}
@@ -482,12 +485,13 @@ func pbCliDeserialize(pkt *pbx.ClientMsg) *ClientComMessage {
 		}
 	} else if note := pkt.GetNote(); note != nil {
 		msg.Note = &MsgClientNote{
-			Topic:   note.GetTopic(),
-			SeqId:   int(note.GetSeqId()),
-			What:    pbInfoNoteWhatDeserialize(note.GetWhat()),
-			Unread:  int(note.GetUnread()),
-			Event:   pbCallEventDeserialize(note.GetEvent()),
-			Payload: note.GetPayload(),
+			Topic:    note.GetTopic(),
+			SeqId:    int(note.GetSeqId()),
+			What:     pbInfoNoteWhatDeserialize(note.GetWhat()),
+			Unread:   int(note.GetUnread()),
+			Event:    pbCallEventDeserialize(note.GetEvent()),
+			Payload:  note.GetPayload(),
+			Reaction: note.GetReaction(),
 		}
 	}
 
@@ -756,6 +760,8 @@ func pbInfoNoteWhatSerialize(what string) pbx.InfoNote {
 		out = pbx.InfoNote_RECV
 	case "call":
 		out = pbx.InfoNote_CALL
+	case "react":
+		out = pbx.InfoNote_REACT
 	default:
 		logs.Info.Println("unknown info-note.what", what)
 	}
@@ -773,6 +779,8 @@ func pbInfoNoteWhatDeserialize(what pbx.InfoNote) string {
 		out = "recv"
 	case pbx.InfoNote_CALL:
 		out = "call"
+	case pbx.InfoNote_REACT:
+		out = "react"
 	default:
 	}
 	return out

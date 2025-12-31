@@ -310,7 +310,7 @@ type MsgClientDel struct {
 type MsgClientNote struct {
 	// There is no Id -- server will not akn {ping} packets, they are "fire and forget"
 	Topic string `json:"topic"`
-	// what is being reported: "recv" - message received, "read" - message read, "kp" - typing notification
+	// what is being reported: "recv" - message received, "read" - message read, "kp" - typing notification, "react" - emoji reaction
 	What string `json:"what"`
 	// Server-issued message ID being reported
 	SeqId int `json:"seq,omitempty"`
@@ -320,6 +320,8 @@ type MsgClientNote struct {
 	Event string `json:"event,omitempty"`
 	// Arbitrary json payload (used in video calls).
 	Payload json.RawMessage `json:"payload,omitempty"`
+	// Emoji reaction (used with what="react").
+	Reaction string `json:"reaction,omitempty"`
 }
 
 // MsgClientExtra is not a stand-alone message but extra data which augments the main payload.
@@ -534,7 +536,7 @@ type MsgTopicSub struct {
 	// Id of the latest Delete operation
 	DelId int `json:"clear,omitempty"`
 	// Number of subscribers, group topics only.
-	SubCnt  int `json:"subcnt,omitempty"`
+	SubCnt int `json:"subcnt,omitempty"`
 	// P2P topics in 'me' {get subs} response:
 
 	// Other user's last online timestamp & user agent
@@ -556,7 +558,7 @@ func (src *MsgTopicSub) describe() string {
 	if src.DelId != 0 {
 		s += " clear=" + strconv.Itoa(src.DelId)
 	}
-		if src.SubCnt != 0 {
+	if src.SubCnt != 0 {
 		s += " subcnt=" + strconv.Itoa(src.SubCnt)
 	}
 	if src.Public != nil {
@@ -786,7 +788,7 @@ type MsgServerInfo struct {
 	Src string `json:"src,omitempty"`
 	// ID of the user who originated the message.
 	From string `json:"from,omitempty"`
-	// The event being reported: "rcpt" - message received, "read" - message read, "kp" - typing notification, "call" - video call.
+	// The event being reported: "rcpt" - message received, "read" - message read, "kp" - typing notification, "call" - video call, "react" - emoji reaction.
 	What string `json:"what"`
 	// Server-issued message ID being reported.
 	SeqId int `json:"seq,omitempty"`
@@ -794,6 +796,8 @@ type MsgServerInfo struct {
 	Event string `json:"event,omitempty"`
 	// Arbitrary json payload (used by video calls).
 	Payload json.RawMessage `json:"payload,omitempty"`
+	// Emoji reaction (used with what="react").
+	Reaction string `json:"reaction,omitempty"`
 
 	// UNroutable params. All marked with `json:"-"` to exclude from json marshaling.
 	// They are still serialized for intra-cluster communication.

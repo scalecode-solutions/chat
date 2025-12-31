@@ -1273,6 +1273,11 @@ func (s *Session) note(msg *ClientComMessage) {
 		if msg.Note.SeqId <= 0 {
 			return
 		}
+	case "react":
+		// Emoji reaction: requires valid SeqId and non-empty reaction string.
+		if msg.Note.SeqId <= 0 || msg.Note.Reaction == "" {
+			return
+		}
 	default:
 		return
 	}

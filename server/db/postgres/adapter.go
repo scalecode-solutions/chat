@@ -2690,6 +2690,95 @@ func (a *adapter) MessageGetAll(topic string, forUser t.Uid, opts *t.QueryOpt) (
 	return msgs, err
 }
 
+// MessageAddReaction adds or removes an emoji reaction to a message.
+// Reactions are stored in the message's Head field as: {"reactions": {"👍": ["usrAAA", "usrBBB"], ...}}
+func (a *adapter) MessageAddReaction(topic string, seqId int, oderId string, reaction string) error {
+	ctx, cancel := a.getContext()
+	if cancel != nil {
+		defer cancel()
+	}
+
+	// Start a transaction
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Get current head
+	var head t.KVMap
+	err = tx.QueryRow(ctx, `SELECT head FROM messages WHERE topic=$1 AND seqid=$2 AND delid=0`, topic, seqId).Scan(&head)
+	if err != nil {
+		return err
+	}
+
+	if head == nil {
+		head = make(t.KVMap)
+	}
+
+	// Get or create reactions map
+	var reactions map[string][]string
+	if r, ok := head["reactions"]; ok {
+		if rmap, ok := r.(map[string]any); ok {
+			reactions = make(map[string][]string)
+			for k, v := range rmap {
+				if arr, ok := v.([]any); ok {
+					users := make([]string, 0, len(arr))
+					for _, u := range arr {
+						if s, ok := u.(string); ok {
+							users = append(users, s)
+						}
+					}
+					reactions[k] = users
+				}
+			}
+		}
+	}
+	if reactions == nil {
+		reactions = make(map[string][]string)
+	}
+
+	// Toggle reaction: add if not present, remove if present
+	users := reactions[reaction]
+	found := false
+	newUsers := make([]string, 0, len(users))
+	for _, u := range users {
+		if u == oderId {
+			found = true
+		} else {
+			newUsers = append(newUsers, u)
+		}
+	}
+
+	if found {
+		// Remove reaction
+		if len(newUsers) > 0 {
+			reactions[reaction] = newUsers
+		} else {
+			delete(reactions, reaction)
+		}
+	} else {
+		// Add reaction
+		reactions[reaction] = append(users, oderId)
+	}
+
+	// Update head with new reactions
+	if len(reactions) > 0 {
+		head["reactions"] = reactions
+	} else {
+		delete(head, "reactions")
+	}
+
+	// Save updated head
+	_, err = tx.Exec(ctx, `UPDATE messages SET head=$1, updatedat=$2 WHERE topic=$3 AND seqid=$4`,
+		head, t.TimeNow(), topic, seqId)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 // Get ranges of deleted messages
 func (a *adapter) MessageGetDeleted(topic string, forUser t.Uid, opts *t.QueryOpt) ([]t.DelMessage, error) {
 	var limit = a.maxResults
