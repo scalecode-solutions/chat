@@ -27,7 +27,9 @@ var msgEncryption *MessageEncryption
 func InitMessageEncryption(keyBase64 string) error {
 	if keyBase64 == "" {
 		msgEncryption = &MessageEncryption{enabled: false}
-		logs.Info.Println("Message encryption at rest: DISABLED")
+		if logs.Info != nil {
+			logs.Info.Println("Message encryption at rest: DISABLED")
+		}
 		return nil
 	}
 
@@ -56,7 +58,9 @@ func InitMessageEncryption(keyBase64 string) error {
 		gcm:     gcm,
 	}
 
-	logs.Info.Println("Message encryption at rest: ENABLED")
+	if logs.Info != nil {
+		logs.Info.Println("Message encryption at rest: ENABLED")
+	}
 	return nil
 }
 
