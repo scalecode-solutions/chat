@@ -6,12 +6,68 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 ## Already Implemented ✅
 
-### 1. PostgreSQL Database Creation Fix
+### 1. PostgreSQL Database Creation Fix (Our Fix)
 **Issue**: Official `tinode/tinode-postgres` image fails when database already exists but has no schema.
 
 **Fix**: Modified `server/db/postgres/adapter.go` `CreateDb()` to catch PostgreSQL error code `42P04` (duplicate_database) and continue instead of failing.
 
 **Status**: ✅ Deployed and working
+
+---
+
+## Features Already in Tinode (No Work Needed)
+
+After reviewing the codebase, these features from GitHub issues are **already implemented**:
+
+### 1. Reply/Quote Messages ✅
+**GitHub Issue**: Was requested but already exists!
+
+**How it works**: Use the `head` field in `{pub}` messages:
+```json
+{
+  "pub": {
+    "topic": "usrXXX",
+    "head": {
+      "reply": "grp1XUtEhjv6HND:123"
+    },
+    "content": "This is my reply"
+  }
+}
+```
+- `reply`: topic-unique ID of the message being replied to (format: `":123"` or `"topicName:123"`)
+- `thread`: for threading conversations (first message ID in thread)
+
+**Location**: Documented in `docs/API.md` line 935
+
+### 2. Message Delete Age Limit ✅
+**Config**: `msg_delete_age` in `tinode.conf`
+
+Already supports limiting how old messages can be when deleted by non-owners. Set in seconds (e.g., `600` = 10 minutes).
+
+**Location**: `server/main.go` lines 315-319
+
+### 3. P2P Delete Permission ✅
+**Config**: `p2p_delete_enabled` in `tinode.conf`
+
+Controls whether P2P participants can hard-delete messages.
+
+### 4. Read/Recv Receipts ✅
+Already fully implemented via `{note}` messages:
+- `"what": "recv"` - message received
+- `"what": "read"` - message read
+- `"what": "kp"` - typing indicator
+
+**Location**: `server/datamodel.go` lines 309-323
+
+### 5. Drafty Rich Text Format ✅
+Full support for:
+- Bold, italic, strikethrough, code
+- Links, mentions, hashtags
+- Images, audio, video attachments
+- File attachments
+- Interactive buttons/forms
+
+**Location**: `docs/drafty.md`
 
 ---
 
@@ -43,17 +99,16 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 ---
 
-## Feature Requests (Relevant to Our Use Case)
+## Still Needed - Feature Requests
 
 ### 1. Message Expiration / Auto-Delete Timer ⭐
 **GitHub Issue**: [#941](https://github.com/tinode/chat/issues/941)
 
-**Description**: Automatically hard-delete messages after a configurable time period.
-- Either party can set expiration time for P2P topics
-- Site admin can enable/disable feature or force deletion
+**Description**: Automatically hard-delete messages after a configurable time period (disappearing messages).
+- Currently only `msg_delete_age` exists (limits manual deletion age)
+- Need: automatic timer-based deletion like Signal/WhatsApp
 
-**Why Useful**: Privacy feature, reduces storage, "disappearing messages" like Signal/WhatsApp
-
+**Status**: NOT IMPLEMENTED - would need new feature
 **Complexity**: Medium-High
 **Priority**: Medium
 
@@ -62,14 +117,13 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 ### 2. Message Encryption at Rest ⭐
 **GitHub Issue**: [#967](https://github.com/tinode/chat/issues/967)
 
-**Description**: Encrypt messages stored in the database to prevent access via DB tools.
-- NOT end-to-end encryption (that's a separate issue #357)
+**Description**: Encrypt messages stored in the database.
+- NOT end-to-end encryption
 - Server-side encryption for data at rest
 
-**Why Useful**: Security/compliance, protects against DB breaches
-
+**Status**: NOT IMPLEMENTED
 **Complexity**: Medium
-**Priority**: Medium-High for production use
+**Priority**: Medium-High for production
 
 ---
 
@@ -78,8 +132,7 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 **Description**: Allow users to see their active sessions across devices.
 
-**Why Useful**: Security feature, users can see if someone else is logged in
-
+**Status**: NOT IMPLEMENTED (devices are tracked but not exposed to users)
 **Complexity**: Low-Medium
 **Priority**: Low
 
@@ -90,9 +143,8 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 **Description**: Share location in chat messages.
 
-**Why Useful**: Common messaging feature
-
-**Complexity**: Low (mostly client-side, server just stores coordinates)
+**Status**: NOT IMPLEMENTED (but easy - just use Drafty with custom entity)
+**Complexity**: Low (mostly client-side)
 **Priority**: Low
 
 ---
@@ -102,8 +154,7 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 **Description**: Share contact cards in chat.
 
-**Why Useful**: Common messaging feature
-
+**Status**: NOT IMPLEMENTED (but easy - just use Drafty with custom entity)
 **Complexity**: Low
 **Priority**: Low
 
@@ -111,71 +162,46 @@ This document tracks potential improvements, bug fixes, and feature additions fo
 
 ## Custom Improvements We Could Add
 
-### 1. Better Delivery/Read Receipt Timestamps
-**Current State**: Tinode has `recv` and `read` notifications but timestamps could be more granular.
+### 1. Delivery Timestamp in Receipts
+**Current State**: `{note what="recv"}` doesn't include timestamp of when message was received.
 
-**Improvement**: Add precise timestamps for:
-- Message sent
-- Message delivered to server
-- Message delivered to recipient device
-- Message read by recipient
+**Improvement**: Add timestamp to receipt notifications so sender knows exactly when message was delivered/read.
 
-**Complexity**: Low-Medium
-**Priority**: High (you specifically mentioned this requirement)
+**Current protocol**:
+```json
+{"note": {"topic": "usrXXX", "what": "recv", "seq": 123}}
+```
 
----
-
-### 2. Improved Offline Message Queueing Visibility
-**Current State**: Messages queue on server when recipient is offline.
-
-**Improvement**: Add API to query pending/queued messages count, delivery status.
+**Could add**:
+```json
+{"note": {"topic": "usrXXX", "what": "recv", "seq": 123, "ts": "2025-12-31T12:00:00Z"}}
+```
 
 **Complexity**: Low
-**Priority**: Medium
+**Priority**: High (you specifically need sent/delivered/read with timestamps)
 
 ---
 
-### 3. Typing Indicator Improvements
-**Current State**: Basic "kp" (key press) notification.
-
-**Improvement**: 
-- Add "stopped typing" detection (timeout-based)
-- Add "recording audio/video" status
-
-**Complexity**: Low
-**Priority**: Low
-
----
-
-### 4. Message Reactions
+### 2. Message Reactions
 **Current State**: Not supported.
 
 **Improvement**: Add emoji reactions to messages (like iMessage, Slack).
 
-**Complexity**: Medium
+**Complexity**: Medium (need new message type or head field)
 **Priority**: Low (nice to have)
-
----
-
-### 5. Reply/Quote Messages
-**Current State**: Not natively supported.
-
-**Improvement**: Add ability to reply to specific messages with quote.
-
-**Complexity**: Medium
-**Priority**: Medium (common feature in modern messengers)
 
 ---
 
 ## Recommended Priority Order
 
-For a Yahoo Messenger-style 1:1 chat app:
+For your Yahoo Messenger-style 1:1 chat app:
 
-1. **Delivery/Read Receipt Timestamps** - You specifically need this
-2. **Unread Counter Bug Fix** (#898) - Affects UX
-3. **Message Encryption at Rest** (#967) - Security
-4. **Message Expiration** (#941) - Privacy feature
-5. **Reply/Quote Messages** - Modern UX expectation
+1. ✅ **Reply/Quote Messages** - Already implemented!
+2. ✅ **Read/Delivered Receipts** - Already implemented!
+3. ⚠️ **Delivery Timestamps** - Minor enhancement needed
+4. 🐛 **Unread Counter Bug Fix** (#898) - Affects UX
+5. 🔒 **Message Encryption at Rest** (#967) - Security
+6. ⏱️ **Message Expiration** (#941) - Privacy feature
 
 ---
 
