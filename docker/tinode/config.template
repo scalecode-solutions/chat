@@ -72,6 +72,7 @@
 		"uid_key": "$UID_ENCRYPTION_KEY",
 		"max_results": 1024,
 		"use_adapter": "$STORE_USE_ADAPTER",
+		"encryption_key": "$MSG_ENCRYPTION_KEY",
 		"adapters": {
 			"mysql": {
 				"database": "tinode",

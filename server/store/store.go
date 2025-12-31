@@ -33,6 +33,9 @@ type configType struct {
 	UseAdapter string `json:"use_adapter"`
 	// Configurations for individual adapters.
 	Adapters map[string]json.RawMessage `json:"adapters"`
+	// Base64-encoded 32-byte AES key for encrypting message content at rest.
+	// If empty, encryption is disabled.
+	EncryptionKey string `json:"encryption_key"`
 }
 
 func openAdapter(workerId int, jsonconf json.RawMessage) error {
@@ -79,6 +82,11 @@ func openAdapter(workerId int, jsonconf json.RawMessage) error {
 	var adapterConfig json.RawMessage
 	if config.Adapters != nil {
 		adapterConfig = config.Adapters[adp.GetName()]
+	}
+
+	// Initialize message encryption
+	if err := InitMessageEncryption(config.EncryptionKey); err != nil {
+		return errors.New("store: failed to init message encryption: " + err.Error())
 	}
 
 	return adp.Open(adapterConfig)
@@ -682,6 +690,18 @@ var Messages MessagesPersistenceInterface
 func (messagesMapper) Save(msg *types.Message, attachmentURLs []string, readBySender bool) (error, bool) {
 	msg.InitTimes()
 	msg.SetUid(Store.GetUid())
+
+	// Encrypt message content if encryption is enabled
+	if IsEncryptionEnabled() && msg.Content != nil {
+		encrypted, err := EncryptContent(msg.Content)
+		if err != nil {
+			logs.Warn.Printf("Failed to encrypt message content: %v", err)
+			// Continue without encryption rather than failing
+		} else {
+			msg.Content = encrypted
+		}
+	}
+
 	// Increment topic's or user's SeqId
 	err := adp.TopicUpdateOnMessage(msg.Topic, msg)
 	if err != nil {
@@ -769,7 +789,27 @@ func (messagesMapper) DeleteList(topic string, delID int, forUser types.Uid, msg
 
 // GetAll returns multiple messages.
 func (messagesMapper) GetAll(topic string, forUser types.Uid, opt *types.QueryOpt) ([]types.Message, error) {
-	return adp.MessageGetAll(topic, forUser, opt)
+	msgs, err := adp.MessageGetAll(topic, forUser, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrypt message content if encryption is enabled
+	if IsEncryptionEnabled() {
+		for i := range msgs {
+			if msgs[i].Content != nil {
+				decrypted, err := DecryptContent(msgs[i].Content)
+				if err != nil {
+					logs.Warn.Printf("Failed to decrypt message %d: %v", msgs[i].SeqId, err)
+					// Keep encrypted content rather than failing
+				} else {
+					msgs[i].Content = decrypted
+				}
+			}
+		}
+	}
+
+	return msgs, nil
 }
 
 // GetDeleted returns the ranges of deleted messages and the largest DelId reported in the list.
