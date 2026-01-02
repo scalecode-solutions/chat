@@ -1118,6 +1118,23 @@ func (t *Topic) handlePubBroadcast(msg *ClientComMessage) {
 		}
 	}
 
+	// Validate reply reference if present
+	if msg.Pub.Head != nil {
+		if reply, ok := msg.Pub.Head["reply"].(map[string]any); ok {
+			if replySeq, ok := reply["seq"].(float64); ok {
+				seq := int(replySeq)
+				// Validate: seq must be > 0 and <= topic.lastID
+				if seq <= 0 || seq > t.lastID {
+					// Invalid reply reference - strip it
+					delete(msg.Pub.Head, "reply")
+				}
+			} else {
+				// Invalid reply format - strip it
+				delete(msg.Pub.Head, "reply")
+			}
+		}
+	}
+
 	// Save to DB at master topic.
 	var attachments []string
 	if msg.Extra != nil && len(msg.Extra.Attachments) > 0 {
