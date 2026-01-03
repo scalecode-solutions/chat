@@ -1278,6 +1278,16 @@ func (s *Session) note(msg *ClientComMessage) {
 		if msg.Note.SeqId <= 0 || msg.Note.Reaction == "" {
 			return
 		}
+	case "edit":
+		// Message edit: requires valid SeqId and non-empty content.
+		if msg.Note.SeqId <= 0 || msg.Note.Content == nil {
+			return
+		}
+	case "unsend":
+		// Message unsend: requires valid SeqId.
+		if msg.Note.SeqId <= 0 {
+			return
+		}
 	default:
 		return
 	}
