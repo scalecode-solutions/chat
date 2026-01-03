@@ -1280,12 +1280,16 @@ func (s *Session) note(msg *ClientComMessage) {
 		}
 	case "edit":
 		// Message edit: requires valid SeqId and non-empty content.
+		logs.Info.Printf("session.note: received edit for seq %d, content=%v", msg.Note.SeqId, msg.Note.Content)
 		if msg.Note.SeqId <= 0 || msg.Note.Content == nil {
+			logs.Warn.Printf("session.note: edit rejected - seqId=%d, content=%v", msg.Note.SeqId, msg.Note.Content)
 			return
 		}
 	case "unsend":
 		// Message unsend: requires valid SeqId.
+		logs.Info.Printf("session.note: received unsend for seq %d", msg.Note.SeqId)
 		if msg.Note.SeqId <= 0 {
+			logs.Warn.Printf("session.note: unsend rejected - seqId=%d", msg.Note.SeqId)
 			return
 		}
 	default:

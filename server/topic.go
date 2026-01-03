@@ -1310,6 +1310,7 @@ func (t *Topic) handleNoteBroadcast(msg *ClientComMessage) {
 // handleEdit processes message edit {note what="edit"} messages.
 // Constraints: max 10 edits within 15 minute window from original message.
 func (t *Topic) handleEdit(msg *ClientComMessage) {
+	logs.Info.Printf("topic[%s]: handleEdit called for seq %d", t.name, msg.Note.SeqId)
 	asUid := types.ParseUserId(msg.AsUser)
 	seqId := msg.Note.SeqId
 	newContent := msg.Note.Content
@@ -1387,6 +1388,7 @@ func (t *Topic) handleEdit(msg *ClientComMessage) {
 // handleUnsend processes message unsend {note what="unsend"} messages.
 // Constraint: can only unsend within 10 minutes of sending.
 func (t *Topic) handleUnsend(msg *ClientComMessage) {
+	logs.Info.Printf("topic[%s]: handleUnsend called for seq %d", t.name, msg.Note.SeqId)
 	asUid := types.ParseUserId(msg.AsUser)
 	seqId := msg.Note.SeqId
 
