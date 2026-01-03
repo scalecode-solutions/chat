@@ -2834,6 +2834,7 @@ func (a *adapter) MessageEdit(topic string, seqId int, content any, editedAt tim
 	}
 
 	// Update head with edit metadata
+	head["edited"] = true
 	head["edited_at"] = editedAt.Format(time.RFC3339)
 	head["edit_count"] = editCount
 
