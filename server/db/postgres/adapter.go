@@ -2787,12 +2787,16 @@ func (a *adapter) MessageGetBySeqId(topic string, seqId int) (*t.Message, error)
 	}
 
 	var msg t.Message
+	var from int64
 	err := a.db.QueryRow(ctx,
-		`SELECT topic, seqid, createdat, updatedat, deletedat, delid, sender, head, content 
+		`SELECT topic, seqid, createdat, updatedat, deletedat, delid, "from", head, content 
 		 FROM messages WHERE topic=$1 AND seqid=$2 AND delid=0`,
 		topic, seqId).Scan(
 		&msg.Topic, &msg.SeqId, &msg.CreatedAt, &msg.UpdatedAt, &msg.DeletedAt,
-		&msg.DelId, &msg.From, &msg.Head, &msg.Content)
+		&msg.DelId, &from, &msg.Head, &msg.Content)
+	if err == nil {
+		msg.From = store.EncodeUid(t.Uid(from)).String()
+	}
 
 	if err != nil {
 		if err.Error() == "no rows in result set" {
