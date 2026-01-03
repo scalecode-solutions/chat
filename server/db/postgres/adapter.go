@@ -2795,7 +2795,7 @@ func (a *adapter) MessageGetBySeqId(topic string, seqId int) (*t.Message, error)
 		&msg.Topic, &msg.SeqId, &msg.CreatedAt, &msg.UpdatedAt, &msg.DeletedAt,
 		&msg.DelId, &from, &msg.Head, &msg.Content)
 	if err == nil {
-		msg.From = store.EncodeUid(from).String()
+		msg.From = store.EncodeUid(from).UserId()
 	}
 
 	if err != nil {

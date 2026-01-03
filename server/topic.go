@@ -1333,9 +1333,9 @@ func (t *Topic) handleEdit(msg *ClientComMessage) {
 	}
 
 	// Only the sender can edit their own message.
-	logs.Info.Printf("topic[%s]: edit ownership check - origMsg.From=%s, asUid.UserId()=%s", t.name, origMsg.From, asUid.UserId())
+	// origMsg.From is in "usrXXX" format, asUid.UserId() also returns "usrXXX" format
 	if origMsg.From != asUid.UserId() {
-		logs.Warn.Printf("topic[%s]: edit denied - not message owner", t.name)
+		logs.Warn.Printf("topic[%s]: edit denied - not message owner (from=%s, user=%s)", t.name, origMsg.From, asUid.UserId())
 		return
 	}
 
