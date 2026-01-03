@@ -3491,6 +3491,18 @@ func (t *Topic) replyDelMsg(sess *Session, asUid types.Uid, asChan bool, msg *Cl
 		filters := &presFilters{filterIn: types.ModeRead}
 		t.presSubsOnline("del", params.actor, params, filters, sess.sid)
 		t.presSubsOffline("del", params, filters, nilPresFilters, sess.sid, true)
+
+		// Also broadcast {info} message for delete (for clients that handle info messages)
+		info := &ServerComMessage{
+			Info: &MsgServerInfo{
+				What:  "del",
+				SeqId: ranges[0].Low, // First deleted message seq
+				From:  asUid.UserId(),
+				Topic: t.original(asUid),
+			},
+			SkipSid: sess.sid,
+		}
+		t.broadcastToSessions(info)
 	} else {
 		pud := t.perUser[asUid]
 		pud.delID = t.delID
