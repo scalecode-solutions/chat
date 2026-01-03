@@ -3399,18 +3399,14 @@ func (t *Topic) replyDelMsg(sess *Session, asUid types.Uid, asChan bool, msg *Cl
 	del := msg.Del
 
 	pud := t.perUser[asUid]
-	if !(pud.modeGiven & pud.modeWant).IsDeleter() {
-		// User must have an R permission: if the user cannot read messages, he has
-		// no business of deleting them.
-		if !(pud.modeGiven & pud.modeWant).IsReader() {
-			sess.queueOut(ErrPermissionDeniedReply(msg, now))
-			return errors.New("del.msg: permission denied")
-		}
-
-		// User has just the R permission, cannot hard-delete messages, silently
-		// switching to soft-deleting
-		del.Hard = false
+	// User must have an R permission: if the user cannot read messages, he has
+	// no business of deleting them.
+	if !(pud.modeGiven & pud.modeWant).IsReader() {
+		sess.queueOut(ErrPermissionDeniedReply(msg, now))
+		return errors.New("del.msg: permission denied")
 	}
+	// Note: We allow hard delete for message owners even without D permission.
+	// The ownership check happens later when processing each message.
 
 	var err error
 	var ranges []types.Range
