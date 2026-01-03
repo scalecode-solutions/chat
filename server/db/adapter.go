@@ -168,6 +168,12 @@ type Adapter interface {
 	MessageGetDeleted(topic string, forUser t.Uid, opts *t.QueryOpt) ([]t.DelMessage, error)
 	// MessageAddReaction adds or removes an emoji reaction to a message.
 	MessageAddReaction(topic string, seqId int, oderId string, reaction string) error
+	// MessageGetBySeqId retrieves a single message by topic and sequence ID.
+	MessageGetBySeqId(topic string, seqId int) (*t.Message, error)
+	// MessageEdit updates a message's content and marks it as edited.
+	MessageEdit(topic string, seqId int, content any, editedAt time.Time, editCount int) error
+	// MessageMarkUnsent marks a message as unsent (tombstone).
+	MessageMarkUnsent(topic string, seqId int, unsentAt time.Time) error
 
 	// Devices (for push notifications)
 

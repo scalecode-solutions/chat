@@ -310,7 +310,7 @@ type MsgClientDel struct {
 type MsgClientNote struct {
 	// There is no Id -- server will not akn {ping} packets, they are "fire and forget"
 	Topic string `json:"topic"`
-	// what is being reported: "recv" - message received, "read" - message read, "kp" - typing notification, "react" - emoji reaction
+	// what is being reported: "recv" - message received, "read" - message read, "kp" - typing notification, "react" - emoji reaction, "edit" - message edit, "unsend" - message unsend
 	What string `json:"what"`
 	// Server-issued message ID being reported
 	SeqId int `json:"seq,omitempty"`
@@ -322,6 +322,8 @@ type MsgClientNote struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 	// Emoji reaction (used with what="react").
 	Reaction string `json:"reaction,omitempty"`
+	// New content for message edit (used with what="edit").
+	Content any `json:"content,omitempty"`
 }
 
 // MsgClientExtra is not a stand-alone message but extra data which augments the main payload.
@@ -788,7 +790,7 @@ type MsgServerInfo struct {
 	Src string `json:"src,omitempty"`
 	// ID of the user who originated the message.
 	From string `json:"from,omitempty"`
-	// The event being reported: "rcpt" - message received, "read" - message read, "kp" - typing notification, "call" - video call, "react" - emoji reaction.
+	// The event being reported: "rcpt" - message received, "read" - message read, "kp" - typing notification, "call" - video call, "react" - emoji reaction, "edit" - message edit, "unsend" - message unsend.
 	What string `json:"what"`
 	// Server-issued message ID being reported.
 	SeqId int `json:"seq,omitempty"`
@@ -798,6 +800,10 @@ type MsgServerInfo struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 	// Emoji reaction (used with what="react").
 	Reaction string `json:"reaction,omitempty"`
+	// New content for message edit (used with what="edit").
+	Content any `json:"content,omitempty"`
+	// Timestamp when message was edited (used with what="edit").
+	EditedAt *time.Time `json:"edited_at,omitempty"`
 
 	// UNroutable params. All marked with `json:"-"` to exclude from json marshaling.
 	// They are still serialized for intra-cluster communication.

@@ -1199,6 +1199,20 @@ func (t *Topic) handleNoteBroadcast(msg *ClientComMessage) {
 		}
 		t.handleReaction(msg)
 		return
+	case "edit":
+		// Handle message edit.
+		if !mode.IsWriter() {
+			return
+		}
+		t.handleEdit(msg)
+		return
+	case "unsend":
+		// Handle message unsend.
+		if !mode.IsWriter() {
+			return
+		}
+		t.handleUnsend(msg)
+		return
 	}
 
 	var read, recv, unread, seq int
@@ -1282,6 +1296,140 @@ func (t *Topic) handleNoteBroadcast(msg *ClientComMessage) {
 			From:  msg.AsUser,
 			What:  msg.Note.What,
 			SeqId: msg.Note.SeqId,
+		},
+		RcptTo:    msg.RcptTo,
+		AsUser:    msg.AsUser,
+		Timestamp: msg.Timestamp,
+		SkipSid:   msg.sess.sid,
+		sess:      msg.sess,
+	}
+
+	t.broadcastToSessions(info)
+}
+
+// handleEdit processes message edit {note what="edit"} messages.
+// Constraints: max 10 edits within 15 minute window from original message.
+func (t *Topic) handleEdit(msg *ClientComMessage) {
+	asUid := types.ParseUserId(msg.AsUser)
+	seqId := msg.Note.SeqId
+	newContent := msg.Note.Content
+
+	// Validate SeqId is within valid range.
+	if seqId > t.lastID || seqId <= 0 {
+		return
+	}
+
+	// Validate content is not empty.
+	if newContent == nil {
+		return
+	}
+
+	// Get the original message to validate ownership and timing.
+	origMsg, err := store.Messages.GetBySeqId(t.name, seqId)
+	if err != nil || origMsg == nil {
+		logs.Warn.Printf("topic[%s]: edit failed - message not found: %v", t.name, err)
+		return
+	}
+
+	// Only the sender can edit their own message.
+	if origMsg.From != asUid.UserId() {
+		logs.Warn.Printf("topic[%s]: edit denied - not message owner", t.name)
+		return
+	}
+
+	// Check time window (15 minutes from original message).
+	editWindow := 15 * time.Minute
+	if time.Since(origMsg.CreatedAt) > editWindow {
+		logs.Warn.Printf("topic[%s]: edit denied - outside edit window", t.name)
+		return
+	}
+
+	// Check edit count limit (max 10 edits).
+	editCount := 0
+	if origMsg.Head != nil {
+		if count, ok := origMsg.Head["edit_count"].(float64); ok {
+			editCount = int(count)
+		}
+	}
+	if editCount >= 10 {
+		logs.Warn.Printf("topic[%s]: edit denied - max edit count reached", t.name)
+		return
+	}
+
+	// Update the message in the database.
+	now := types.TimeNow()
+	err = store.Messages.Edit(t.name, seqId, newContent, now, editCount+1)
+	if err != nil {
+		logs.Warn.Printf("topic[%s]: failed to edit message: %v", t.name, err)
+		return
+	}
+
+	// Broadcast the edit to all topic subscribers.
+	info := &ServerComMessage{
+		Info: &MsgServerInfo{
+			Topic:    msg.Original,
+			From:     msg.AsUser,
+			What:     "edit",
+			SeqId:    seqId,
+			Content:  newContent,
+			EditedAt: &now,
+		},
+		RcptTo:    msg.RcptTo,
+		AsUser:    msg.AsUser,
+		Timestamp: msg.Timestamp,
+		SkipSid:   msg.sess.sid,
+		sess:      msg.sess,
+	}
+
+	t.broadcastToSessions(info)
+}
+
+// handleUnsend processes message unsend {note what="unsend"} messages.
+// Constraint: can only unsend within 10 minutes of sending.
+func (t *Topic) handleUnsend(msg *ClientComMessage) {
+	asUid := types.ParseUserId(msg.AsUser)
+	seqId := msg.Note.SeqId
+
+	// Validate SeqId is within valid range.
+	if seqId > t.lastID || seqId <= 0 {
+		return
+	}
+
+	// Get the original message to validate ownership and timing.
+	origMsg, err := store.Messages.GetBySeqId(t.name, seqId)
+	if err != nil || origMsg == nil {
+		logs.Warn.Printf("topic[%s]: unsend failed - message not found: %v", t.name, err)
+		return
+	}
+
+	// Only the sender can unsend their own message.
+	if origMsg.From != asUid.UserId() {
+		logs.Warn.Printf("topic[%s]: unsend denied - not message owner", t.name)
+		return
+	}
+
+	// Check time window (10 minutes from original message).
+	unsendWindow := 10 * time.Minute
+	if time.Since(origMsg.CreatedAt) > unsendWindow {
+		logs.Warn.Printf("topic[%s]: unsend denied - outside unsend window", t.name)
+		return
+	}
+
+	// Mark the message as unsent in the database.
+	now := types.TimeNow()
+	err = store.Messages.MarkUnsent(t.name, seqId, now)
+	if err != nil {
+		logs.Warn.Printf("topic[%s]: failed to unsend message: %v", t.name, err)
+		return
+	}
+
+	// Broadcast the unsend to all topic subscribers.
+	info := &ServerComMessage{
+		Info: &MsgServerInfo{
+			Topic: msg.Original,
+			From:  msg.AsUser,
+			What:  "unsend",
+			SeqId: seqId,
 		},
 		RcptTo:    msg.RcptTo,
 		AsUser:    msg.AsUser,

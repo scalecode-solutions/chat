@@ -679,6 +679,9 @@ type MessagesPersistenceInterface interface {
 	GetAll(topic string, forUser types.Uid, opt *types.QueryOpt) ([]types.Message, error)
 	GetDeleted(topic string, forUser types.Uid, opt *types.QueryOpt) ([]types.Range, int, error)
 	AddReaction(topic string, seqId int, oderId string, reaction string) error
+	GetBySeqId(topic string, seqId int) (*types.Message, error)
+	Edit(topic string, seqId int, content any, editedAt time.Time, editCount int) error
+	MarkUnsent(topic string, seqId int, unsentAt time.Time) error
 }
 
 // messagesMapper is a concrete type implementing MessagesPersistenceInterface.
@@ -840,6 +843,46 @@ func (messagesMapper) GetDeleted(topic string, forUser types.Uid, opt *types.Que
 // If the user already has this reaction, it is removed (toggle behavior).
 func (messagesMapper) AddReaction(topic string, seqId int, oderId string, reaction string) error {
 	return adp.MessageAddReaction(topic, seqId, oderId, reaction)
+}
+
+// GetBySeqId retrieves a single message by topic and sequence ID.
+func (messagesMapper) GetBySeqId(topic string, seqId int) (*types.Message, error) {
+	msg, err := adp.MessageGetBySeqId(topic, seqId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrypt message content if encryption is enabled
+	if IsEncryptionEnabled() && msg != nil && msg.Content != nil {
+		decrypted, err := DecryptContent(msg.Content)
+		if err != nil {
+			logs.Warn.Printf("Failed to decrypt message %d: %v", msg.SeqId, err)
+		} else {
+			msg.Content = decrypted
+		}
+	}
+
+	return msg, nil
+}
+
+// Edit updates a message's content and marks it as edited.
+func (messagesMapper) Edit(topic string, seqId int, content any, editedAt time.Time, editCount int) error {
+	// Encrypt new content if encryption is enabled
+	if IsEncryptionEnabled() && content != nil {
+		encrypted, err := EncryptContent(content)
+		if err != nil {
+			logs.Warn.Printf("Failed to encrypt edited message content: %v", err)
+		} else {
+			content = encrypted
+		}
+	}
+
+	return adp.MessageEdit(topic, seqId, content, editedAt, editCount)
+}
+
+// MarkUnsent marks a message as unsent (tombstone).
+func (messagesMapper) MarkUnsent(topic string, seqId int, unsentAt time.Time) error {
+	return adp.MessageMarkUnsent(topic, seqId, unsentAt)
 }
 
 // Registered authentication handlers.

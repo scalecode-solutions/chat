@@ -2779,6 +2779,117 @@ func (a *adapter) MessageAddReaction(topic string, seqId int, oderId string, rea
 	return tx.Commit(ctx)
 }
 
+// MessageGetBySeqId retrieves a single message by topic and sequence ID.
+func (a *adapter) MessageGetBySeqId(topic string, seqId int) (*t.Message, error) {
+	ctx, cancel := a.getContext()
+	if cancel != nil {
+		defer cancel()
+	}
+
+	var msg t.Message
+	err := a.db.QueryRow(ctx,
+		`SELECT topic, seqid, createdat, updatedat, deletedat, delid, sender, head, content 
+		 FROM messages WHERE topic=$1 AND seqid=$2 AND delid=0`,
+		topic, seqId).Scan(
+		&msg.Topic, &msg.SeqId, &msg.CreatedAt, &msg.UpdatedAt, &msg.DeletedAt,
+		&msg.DelId, &msg.From, &msg.Head, &msg.Content)
+
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &msg, nil
+}
+
+// MessageEdit updates a message's content and marks it as edited.
+func (a *adapter) MessageEdit(topic string, seqId int, content any, editedAt time.Time, editCount int) error {
+	ctx, cancel := a.getContext()
+	if cancel != nil {
+		defer cancel()
+	}
+
+	// Start a transaction
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Get current head
+	var head t.KVMap
+	err = tx.QueryRow(ctx, `SELECT head FROM messages WHERE topic=$1 AND seqid=$2 AND delid=0`, topic, seqId).Scan(&head)
+	if err != nil {
+		return err
+	}
+
+	if head == nil {
+		head = make(t.KVMap)
+	}
+
+	// Update head with edit metadata
+	head["edited_at"] = editedAt.Format(time.RFC3339)
+	head["edit_count"] = editCount
+
+	// Serialize content
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+
+	// Update message
+	_, err = tx.Exec(ctx,
+		`UPDATE messages SET content=$1, head=$2, updatedat=$3 WHERE topic=$4 AND seqid=$5`,
+		contentJSON, head, t.TimeNow(), topic, seqId)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// MessageMarkUnsent marks a message as unsent (tombstone).
+func (a *adapter) MessageMarkUnsent(topic string, seqId int, unsentAt time.Time) error {
+	ctx, cancel := a.getContext()
+	if cancel != nil {
+		defer cancel()
+	}
+
+	// Start a transaction
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Get current head
+	var head t.KVMap
+	err = tx.QueryRow(ctx, `SELECT head FROM messages WHERE topic=$1 AND seqid=$2 AND delid=0`, topic, seqId).Scan(&head)
+	if err != nil {
+		return err
+	}
+
+	if head == nil {
+		head = make(t.KVMap)
+	}
+
+	// Mark as unsent in head
+	head["unsent"] = true
+	head["unsent_at"] = unsentAt.Format(time.RFC3339)
+
+	// Clear content and update head
+	_, err = tx.Exec(ctx,
+		`UPDATE messages SET content=NULL, head=$1, updatedat=$2 WHERE topic=$3 AND seqid=$4`,
+		head, t.TimeNow(), topic, seqId)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 // Get ranges of deleted messages
 func (a *adapter) MessageGetDeleted(topic string, forUser t.Uid, opts *t.QueryOpt) ([]t.DelMessage, error) {
 	var limit = a.maxResults
