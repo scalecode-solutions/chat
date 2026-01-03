@@ -3055,7 +3055,8 @@ func messageDeleteList(ctx context.Context, tx pgx.Tx, topic string, toDel *t.De
 			return err
 		}
 
-		query, newargs = expandQuery(`UPDATE messages AS m SET deletedat=?,delid=?,"from"=0,head=NULL,content=NULL WHERE `+
+		// Soft delete: mark as deleted but retain content for server-side retention
+		query, newargs = expandQuery(`UPDATE messages AS m SET deletedat=?,delid=? WHERE `+
 			where, t.TimeNow(), toDel.DelId, args)
 		_, err = tx.Exec(ctx, query, newargs...)
 		if err != nil {
