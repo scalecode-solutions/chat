@@ -110,12 +110,24 @@ func (fh *fshandler) Headers(method string, url *url.URL, headers http.Header, s
 
 // Upload processes request for file upload. The file is given as io.Reader.
 func (fh *fshandler) Upload(fdef *types.FileDef, file io.Reader) (string, int64, error) {
-	// FIXME: create two-three levels of nested directories. Serving from a single directory
-	// with tens of thousands of files in it will not perform well.
+	// Generate a unique file name using base32 to avoid case-sensitivity issues on Windows
+	fileName := fdef.Uid().String32()
 
-	// Generate a unique file name and attach it to path. Using base32 instead of base64 to avoid possible
-	// file name collisions on Windows due to case-insensitive file names there.
-	location := filepath.Join(fh.FileUploadDirectory, fdef.Uid().String32())
+	// Create nested directory structure using first 4 characters of the filename
+	// This distributes files across 32^2 = 1024 directories for better filesystem performance
+	subDir := ""
+	if len(fileName) >= 4 {
+		subDir = filepath.Join(fileName[0:2], fileName[2:4])
+	}
+
+	// Create the nested directory if it doesn't exist
+	fullDir := filepath.Join(fh.FileUploadDirectory, subDir)
+	if err := os.MkdirAll(fullDir, 0777); err != nil {
+		logs.Warn.Println("Upload: failed to create directory", fullDir, err)
+		return "", 0, err
+	}
+
+	location := filepath.Join(fullDir, fileName)
 
 	outfile, err := os.Create(location)
 	if err != nil {

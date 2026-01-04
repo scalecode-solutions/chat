@@ -16,7 +16,7 @@
 
 	"media": {
 		"use_handler": "$MEDIA_HANDLER",
-		"max_size": 33554432,
+		"max_size": 524288000,
 		"gc_period": 60,
 		"gc_block_size": 100,
 		"handlers": {
